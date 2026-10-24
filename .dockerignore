@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+.git/
+.gitignore
+.pytest_cache/
+.coverage
+htmlcov/
+storage/secure_uploads/*
+!storage/secure_uploads/.gitkeep
+README.md
+docker-compose.yml
+Dockerfile

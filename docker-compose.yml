@@ -1,0 +1,66 @@
+services:
+  # Servicio de Base de Datos (Aislado de Internet y del Host)
+  db:
+    image: postgres:16-alpine
+    container_name: medinet_lab_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # SEGURIDAD: NO se usa la directiva 'ports'. La BD es inaccesible desde fuera de Docker.
+    expose:
+      - "5432"
+    volumes:
+      - pg_lab_data:/var/lib/postgresql/data
+    networks:
+      - lab_internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Servicio Backend FastAPI (Módulo LAB)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: medinet-lab-backend:latest
+    container_name: medinet_lab_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Sobrescribe el host para apuntar al nombre del servicio DNS interno de Docker
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      UPLOAD_STORAGE_PATH: /app/storage/secure_uploads
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Volumen persistente montado fuera de cualquier directorio público
+      - lab_uploads_data:/app/storage/secure_uploads
+    networks:
+      - lab_internal_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# Volúmenes persistentes administrados por Docker
+volumes:
+  pg_lab_data:
+    driver: local
+  lab_uploads_data:
+    driver: local
+
+# Red interna aislada para comunicación exclusiva Backend <-> PostgreSQL
+networks:
+  lab_internal_net:
+    driver: bridge
