@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/medinet-lab
+  IMAGE_NAME: yama02s/medinet-lab/medinet-lab
 
 jobs:
   # ============================================================================
