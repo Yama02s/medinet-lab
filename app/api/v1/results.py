@@ -2,7 +2,7 @@ import uuid
 from typing import List
 from pathlib import Path
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -51,7 +51,10 @@ async def upload_result_file(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orden clínica no encontrada")
 
     if order.status in ("CANCELADO", "ENTREGADO"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"No se pueden adjuntar resultados a una orden en estado {order.status}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se pueden adjuntar resultados a una orden en estado {order.status}"
+        )
 
     try:
         orig_name, stored_name, mime, size, sha256, path = await SecureFileService.process_and_save_upload(file)
@@ -141,10 +144,6 @@ async def download_result_file(
         )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tiene autorización para descargar este documento")
 
-    file_path = Path(result_record.storage_path)
-    if not file_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El archivo físico no se encuentra en el repositorio")
-
     background_tasks.add_task(
         send_audit_event,
         AuditEventPayload(
@@ -161,6 +160,21 @@ async def download_result_file(
         "X-Content-Type-Options": "nosniff",
         "Content-Disposition": f'attachment; filename="{result_record.original_filename}"'
     }
+
+    # Descarga desde Amazon S3 (Producción Multi-AZ)
+    if result_record.storage_path.startswith("s3://"):
+        stream = SecureFileService.stream_from_s3(result_record.storage_path)
+        return StreamingResponse(
+            content=stream,
+            media_type=result_record.mime_type,
+            headers=headers
+        )
+
+    # Descarga desde disco local (Pruebas Windows)
+    file_path = Path(result_record.storage_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El archivo físico no se encuentra en el repositorio")
+
     return FileResponse(
         path=file_path,
         media_type=result_record.mime_type,

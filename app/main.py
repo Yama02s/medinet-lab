@@ -1,4 +1,5 @@
 import mimetypes
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
@@ -9,6 +10,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 
 from app.core.config import settings
+from app.core.database import engine
+from app.models.base import Base
 from app.core.exceptions import (
     http_exception_handler,
     validation_exception_handler,
@@ -16,17 +19,25 @@ from app.core.exceptions import (
 )
 from app.api.v1 import health, orders, results
 
-# Asegurar que los archivos .mjs (PDF.js) se sirvan como JavaScript válido
 mimetypes.add_type("application/javascript", ".mjs")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Crea las tablas automáticamente solo si se usa SQLite para pruebas locales en Windows
+    if settings.DATABASE_URL.startswith("sqlite"):
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    yield
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
-# 1. Cabeceras de Seguridad Globales (Middleware)
+# 1. Cabeceras de Seguridad Globales (Middleware - Criterio 2.1.4 & OWASP ZAP)
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -34,8 +45,9 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    
-    # CSP ajustado para permitir recursos propios del frontend y proteger la app
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+
     if not request.url.path.startswith(("/docs", "/redoc", "/openapi.json")):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
