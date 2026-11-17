@@ -1,24 +1,8 @@
-# Entornos virtuales
 .venv/
 venv/
-env/
-
-# Variables de entorno y secretos (NUNCA SUBIR A GITHUB)
-.env
-*.pem
-
-# Caché de Python y Pytest
 __pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Archivos subidos localmente en pruebas
-storage/secure_uploads/*
-!storage/secure_uploads/.gitkeep
-
-# Archivos de editores
-.vscode/
-.idea/
+*.pyc
+.env
+*.db
+storage/*
+!storage/.gitkeep

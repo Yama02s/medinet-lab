@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediNet · Laboratorio</title><link rel="stylesheet" href="/assets/lab.css"><script defer src="/assets/lab.js"></script></head>
+<body><header><strong><span class="mark" aria-hidden="true">✣</span> MediNet</strong><span>Laboratorio clínico</span><button id="logout" hidden>Salir</button></header>
+<main><section id="access"><div class="plate" aria-hidden="true"><svg viewBox="0 0 320 320"><defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#b1ced0" stroke-width=".6"/></pattern><g id="cell"><ellipse rx="29" ry="22" fill="#e5abab" stroke="#c57987" stroke-width="3"/><ellipse rx="15" ry="9" fill="#f1d3c6"/></g></defs><circle cx="160" cy="160" r="148" fill="url(#grid)" stroke="#8fb5bb"/><g transform="translate(93 105) rotate(-24)"><use href="#cell"/></g><g transform="translate(208 88) rotate(38) scale(.8)"><use href="#cell"/></g><g transform="translate(231 196) rotate(-54)"><use href="#cell"/></g><g transform="translate(113 232) rotate(20) scale(.9)"><use href="#cell"/></g><g transform="translate(145 154)"><circle r="33" fill="#c7c6dc" stroke="#a6a7c4"/><path d="M-19 -4C-14 -24 3 -20 5 -9S26 -3 17 12S1 14 -4 8S-24 13 -19 -4" fill="#6e6b96"/></g></svg></div>
+<form id="login"><h1>Acceso al laboratorio</h1><p>Consulta tus órdenes e informes con la credencial de tu cuenta MediNet.</p><label>Token de acceso<input id="token" type="password" required autocomplete="off" spellcheck="false"></label><small>Utiliza el token emitido por el servicio de identidad (IAM).</small><button class="primary">Entrar al laboratorio</button></form></section>
+<section id="desk" hidden><p id="role"></p><h1>Órdenes de laboratorio</h1><div class="tools"><label>Estado<select id="filter"></select></label><button id="refresh">Actualizar</button><button id="create" class="primary" hidden>Nueva orden</button></div>
+<div class="columns"><section><h2>Bandeja de órdenes</h2><div id="orders"></div><nav><button id="prev">Anterior</button><span id="pages"></span><button id="next">Siguiente</button></nav></section><section id="detail" aria-label="Detalle de la orden"></section></div></section>
+<p id="notice" role="status" aria-live="polite"></p></main>
+<dialog id="modal" aria-labelledby="createTitle"><form id="orderForm"><h2 id="createTitle">Nueva orden</h2><label>Identificador del paciente<input name="patient_id" required pattern="[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}" title="UUID del paciente"></label><label>Examen<input name="exam_type" required minlength="3" maxlength="100"></label><label>Prioridad<select name="priority"><option value="normal">Normal</option><option value="urgente">Urgente</option></select></label><label>Notas clínicas (opcional)<textarea name="clinical_notes" maxlength="2000"></textarea></label><p id="formError" role="alert"></p><button type="button" id="close">Volver</button> <button class="primary">Crear orden</button></form></dialog><dialog id="preview" aria-labelledby="previewName">
+  <div class="preview-head"><div><small>Informe de laboratorio</small><h2 id="previewName"></h2></div>
+  <button type="button" id="closePreview" autofocus>Cerrar vista previa</button></div>
+  <p id="previewStatus" role="status"></p>
+  <div id="sheet"><canvas aria-label="Contenido visual del informe" role="img" hidden></canvas></div>
+  <div class="preview-actions">
+    <nav id="pdfPages" aria-label="Páginas del informe" hidden><button id="previousReport">Anterior</button><span id="pageNumber"></span><button id="nextReport">Siguiente</button></nav>
+    <button id="saveReport">Descargar informe</button>
+  </div>
+</dialog>
+</body></html>
+

@@ -1,4 +1,8 @@
+import mimetypes
+from pathlib import Path
 from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -11,6 +15,9 @@ from app.core.exceptions import (
     unhandled_exception_handler
 )
 from app.api.v1 import health, orders, results
+
+# Asegurar que los archivos .mjs (PDF.js) se sirvan como JavaScript válido
+mimetypes.add_type("application/javascript", ".mjs")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -27,8 +34,15 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if not request.url.path.startswith(("/docs", "/redoc")):
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none';"
+    
+    # CSP ajustado para permitir recursos propios del frontend y proteger la app
+    if not request.url.path.startswith(("/docs", "/redoc", "/openapi.json")):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "object-src 'none'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'none';"
+        )
     return response
 
 # 2. CORS Restringido
@@ -49,6 +63,16 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 app.include_router(health.router)
 app.include_router(orders.router)
 app.include_router(results.router)
+
+# 4.1. Montaje del Frontend y Archivos Estáticos
+FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
+
+if FRONTEND_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR)), name="assets")
+
+@app.get("/", include_in_schema=False)
+async def serve_frontend():
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 # 5. OpenAPI y Swagger con autenticación Bearer JWT
 def custom_openapi():
