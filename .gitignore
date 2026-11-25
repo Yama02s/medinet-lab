@@ -6,3 +6,9 @@ __pycache__/
 *.db
 storage/*
 !storage/.gitkeep
+
+#Terraform
+terraform/.terraform/
+terraform/*.tfstate*
+terraform/certs/
+terraform/*.tfvars
