@@ -2,34 +2,55 @@ resource "random_id" "bucket_suffix" {
   byte_length = 4
 }
 
-# Bucket S3 Privado y Cifrado para Exámenes Clínicos (Compartido entre ambas EC2)
-resource "aws_s3_bucket" "lab_results" {
-  bucket        = "${var.project_name}-resultados-${random_id.bucket_suffix.hex}"
-  force_destroy = true
+locals {
+  s3_bucket_name = "${var.project_name}-resultados-${random_id.bucket_suffix.hex}"
 }
 
-resource "aws_s3_bucket_public_access_block" "lab_results" {
-  bucket                  = aws_s3_bucket.lab_results.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
+# Bucket S3 Privado, Versionado y Cifrado (Compatible con Windows PowerShell y SCP de AWS Academy)
+resource "terraform_data" "lab_results_bucket" {
+  input = local.s3_bucket_name
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "lab_results" {
-  bucket = aws_s3_bucket.lab_results.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+  provisioner "local-exec" {
+    interpreter = ["PowerShell", "-Command"]
+    environment = {
+      BUCKET_NAME        = local.s3_bucket_name
+      AWS_DEFAULT_REGION = var.aws_region
     }
-  }
-}
+    command = <<-EOT
+      @'
+      import os, boto3
 
-resource "aws_s3_bucket_versioning" "lab_results" {
-  bucket = aws_s3_bucket.lab_results.id
-  versioning_configuration {
-    status = "Enabled"
+      s3 = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
+      b = os.environ["BUCKET_NAME"]
+
+      if b not in [x["Name"] for x in s3.list_buckets()["Buckets"]]:
+          s3.create_bucket(Bucket=b)
+
+      s3.put_public_access_block(
+          Bucket=b,
+          PublicAccessBlockConfiguration={
+              "BlockPublicAcls": True,
+              "IgnorePublicAcls": True,
+              "BlockPublicPolicy": True,
+              "RestrictPublicBuckets": True,
+          },
+      )
+
+      s3.put_bucket_encryption(
+          Bucket=b,
+          ServerSideEncryptionConfiguration={
+              "Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]
+          },
+      )
+
+      s3.put_bucket_versioning(
+          Bucket=b,
+          VersioningConfiguration={"Status": "Enabled"},
+      )
+
+      print("S3 configurado:", b)
+      '@ | python
+    EOT
   }
 }
 
@@ -45,7 +66,7 @@ resource "aws_db_subnet_group" "rds_subnets" {
 resource "aws_db_instance" "postgres" {
   identifier             = "${var.project_name}-postgres"
   engine                 = "postgres"
-  engine_version         = "16.3"
+  engine_version         = "16"
   instance_class         = "db.t3.micro"
   allocated_storage      = 20
   storage_type           = "gp3"
@@ -56,7 +77,7 @@ resource "aws_db_instance" "postgres" {
   db_subnet_group_name   = aws_db_subnet_group.rds_subnets.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   publicly_accessible    = false
-  multi_az               = false # Mantiene estabilidad en AWS Academy; el DB Subnet Group ya abarca 2 AZs
+  multi_az               = false
   skip_final_snapshot    = true
   deletion_protection    = false
 

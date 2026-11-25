@@ -9,16 +9,17 @@ data "aws_ami" "ubuntu" {
 }
 
 resource "aws_instance" "app_nodes" {
-  count                  = 2
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t3.small"
-  subnet_id              = aws_subnet.private[count.index].id
-  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-  iam_instance_profile   = "LabInstanceProfile"
+  count                       = 2
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = "t3.small"
+  subnet_id                   = aws_subnet.private[count.index].id
+  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
+  iam_instance_profile        = "LabInstanceProfile"
+  user_data_replace_on_change = true
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required" # Exige IMDSv2 (Checkov)
+    http_tokens                 = "required"
     http_put_response_hop_limit = 2
   }
 
@@ -28,47 +29,46 @@ resource "aws_instance" "app_nodes" {
     encrypted   = true
   }
 
-  user_data = <<-EOF
-              #!/bin/bash
-              set -e
-              apt-get update -y
-              apt-get install -y docker.io git
-              systemctl enable --now docker
+  user_data = <<EOF
+#!/bin/bash
+set -e
+apt-get update -y
+apt-get install -y docker.io git
+systemctl enable --now docker
 
-              mkdir -p /opt/medinet
-              cd /opt/medinet
-              git clone ${var.github_repo_url} repo
-              
-              # Detectar si el proyecto está en la raíz o en backend-medinet-lab
-              if [ -d "/opt/medinet/repo/backend-medinet-lab" ]; then
-                APP_DIR="/opt/medinet/repo/backend-medinet-lab"
-              else
-                APP_DIR="/opt/medinet/repo"
-              fi
+mkdir -p /opt/medinet
+cd /opt/medinet
+git clone ${var.github_repo_url} repo
 
-              cd "$APP_DIR"
+if [ -d "/opt/medinet/repo/backend-medinet-lab" ]; then
+  APP_DIR="/opt/medinet/repo/backend-medinet-lab"
+else
+  APP_DIR="/opt/medinet/repo"
+fi
 
-              cat <<EOT > .env
-              PROJECT_NAME="MediNet LAB Service"
-              ENVIRONMENT="production"
-              DEBUG=False
-              API_V1_STR="/api/lab"
-              DATABASE_URL="postgresql+asyncpg://${var.db_username}:${var.db_password}@${aws_db_instance.postgres.endpoint}/medinet_lab_db"
-              JWT_SECRET_KEY="${var.jwt_secret_key}"
-              STORAGE_BACKEND="s3"
-              AWS_S3_BUCKET_NAME="${aws_s3_bucket.lab_results.id}"
-              AWS_REGION="${var.aws_region}"
-              BACKEND_CORS_ORIGINS=["https://${var.domain_name}"]
-              EOT
+cd "$APP_DIR"
 
-              docker build -t medinet-lab:latest .
-              docker run --rm --env-file .env medinet-lab:latest alembic upgrade head
-              docker run -d --name medinet-lab-app --restart always -p 8000:8000 --env-file .env medinet-lab:latest
-              EOF
+cat <<EOT > .env
+PROJECT_NAME=MediNet LAB Service
+ENVIRONMENT=production
+DEBUG=False
+API_V1_STR=/api/lab
+DATABASE_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${aws_db_instance.postgres.endpoint}/medinet_lab_db
+JWT_SECRET_KEY=${var.jwt_secret_key}
+STORAGE_BACKEND=s3
+AWS_S3_BUCKET_NAME=${terraform_data.lab_results_bucket.output}
+AWS_REGION=${var.aws_region}
+BACKEND_CORS_ORIGINS=["https://${var.domain_name}"]
+EOT
+
+docker build -t medinet-lab:latest .
+docker run --rm --env-file .env medinet-lab:latest alembic upgrade head
+docker run -d --name medinet-lab-app --restart always -p 8000:8000 --env-file .env medinet-lab:latest
+EOF
 
   depends_on = [
     aws_db_instance.postgres,
-    aws_s3_bucket.lab_results,
+    terraform_data.lab_results_bucket,
     aws_nat_gateway.nat
   ]
 

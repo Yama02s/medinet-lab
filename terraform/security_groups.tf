@@ -20,15 +20,18 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  egress {
-    description     = "Salida unicamente hacia las instancias EC2 en puerto 8000"
-    from_port       = 8000
-    to_port         = 8000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ec2_sg.id]
-  }
-
   tags = { Name = "${var.project_name}-alb-sg" }
+}
+
+# Regla independiente de salida del ALB hacia las EC2 (Rompe la dependencia circular)
+resource "aws_security_group_rule" "alb_to_ec2" {
+  type                     = "egress"
+  description              = "Salida unicamente hacia las instancias EC2 en puerto 8000"
+  from_port                = 8000
+  to_port                  = 8000
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.alb_sg.id
+  source_security_group_id = aws_security_group.ec2_sg.id
 }
 
 # Capa 2: Security Group de los nodos EC2 (Solo acepta tráfico del ALB)

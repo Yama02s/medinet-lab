@@ -5,7 +5,7 @@ output "alb_dns_name" {
 
 output "s3_bucket_name" {
   description = "Nombre del bucket privado S3 creado"
-  value       = aws_s3_bucket.lab_results.id
+  value       = terraform_data.lab_results_bucket.output
 }
 
 output "rds_endpoint" {
