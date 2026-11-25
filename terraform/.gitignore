@@ -1,0 +1,12 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+certs/
+crash.log
+
+tfplan
+checkov.txt
+orden.json
+estado.json

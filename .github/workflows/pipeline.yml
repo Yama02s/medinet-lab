@@ -2,7 +2,7 @@ name: MediNet-LAB DevSecOps CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "eva03" ]
   pull_request:
     branches: [ "main" ]
 
@@ -11,6 +11,22 @@ env:
   IMAGE_NAME: yama02s/medinet-lab/medinet-lab
 
 jobs:
+  # ============================================================================
+  # ETAPA 0: ESCANEO DE SEGURIDAD DE INFRAESTRUCTURA (IaC - Checkov)
+  # ============================================================================
+  iac-scan:
+    name: 0. IaC Security Scan (Checkov)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkov scan of Terraform
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform/
+          framework: terraform
+          compact: true
   # ============================================================================
   # ETAPA 1: PRUEBAS UNITARIAS Y DE SEGURIDAD (IDOR, Magic Bytes, Límite 413)
   # ============================================================================
